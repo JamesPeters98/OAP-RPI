@@ -10,7 +10,7 @@ from envirophat import motion
 
 class AccelerationGraph(QtGui.QMainWindow, ui_main.Ui_MainWindow):
     
-    global points, X, Y_ax, Y_ay, Y_az, Y_r, a
+    global points, X, Y_ax, Y_ay, Y_az, Y_r, a, inactivity_time, inactive
     
     points=100 #number of data points
     #Array of points
@@ -34,11 +34,21 @@ class AccelerationGraph(QtGui.QMainWindow, ui_main.Ui_MainWindow):
         #resultant acceleration
         a = np.sqrt(ax*ax+ay*ay+az*az)
         
-        if(a<0.2):
+        if(a<0.15):
             print("falling detected")
             print(a)
-            r = requests.post("https://maker.ifttt.com/trigger/raspberry_pi/with/key/cy_OmR1__iqa_mYUIMAdzY")
-            print(r.text)
+            inactivity_time = time.time()+1
+            
+        if((inactivity_time < time.time())&&((time.time()-inactivity_time)<=5):
+            if((a <= 1.1)&&(a >= 0.9):
+               inactive = true
+            else
+               inactive = false
+               
+        if((inactivity_time < time.time())&&((time.time()-inactivity_time)>5):
+           if inactive:
+                r = requests.post("https://maker.ifttt.com/trigger/raspberry_pi/with/key/cy_OmR1__iqa_mYUIMAdzY")
+                print(r.text)
             
         
         #print(" ")
