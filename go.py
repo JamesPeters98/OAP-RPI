@@ -5,24 +5,20 @@ import numpy as np
 import pylab
 import time
 import pyqtgraph
-import win32api
+import requests
+from envirophat import motion
 
 class AccelerationGraph(QtGui.QMainWindow, ui_main.Ui_MainWindow):
     
-    global points, X, Y, Y2, Y3, x0, y0, x1, y1, prevDist, dist, t0, t, vx0, vx1, vy0, vy1,a
+    global points, X, Y_ax, Y_ay, Y_az, Y_r, a
     
     points=100 #number of data points
+    #Array of points
     X=np.arange(points)
-    Y=np.zeros(points)
-    Y2 = np.zeros(points)
-    Y3 = np.zeros(points)
-    x0, y0 = win32api.GetCursorPos()
-    x1, y1 = 0, 0
-    t0, t1 = 0, 0
-    vx0, vx1 = 0, 0
-    vy0, vy1 = 0, 0
-    
-    
+    Y_ax = np.zeros(points)
+    Y_ay = np.zeros(points)
+    Y_az = np.zeros(points)
+    Y_r = np.zeros(points)
     
     def __init__(self, parent=None):
         pyqtgraph.setConfigOption('background', 'w') #before loading widget
@@ -31,51 +27,48 @@ class AccelerationGraph(QtGui.QMainWindow, ui_main.Ui_MainWindow):
         self.btnAdd.clicked.connect(self.update)
         self.grPlot.plotItem.showGrid(True, True, 0.7)
         self.chkMore.checked = True
-        
 
     def update(self):
-        global x0,y0,t0,vx0,vx1,vy0,vy1,ax,ay
-                
-        x1, y1 = win32api.GetCursorPos()   
-        x,y = (x1-x0),(y1-y0)
-        dist = np.sqrt((x*x)+(y*y))
-        t = (time.time()-t0)
-        t0 = time.time()
+        #acceleration in each dimension
+        ax,ay,az =  motion.accelerometer()
+        #resultant acceleration
+        a = np.sqrt(ax*ax+ay*ay+az*az)
         
-        vx0,vy0 = vx1,vy1
-        vx1,vy1 = x/t, y/t
+        if(a<0.2):
+            print("falling detected")
+            print(a)
+            r = requests.post("https://maker.ifttt.com/trigger/raspberry_pi/with/key/cy_OmR1__iqa_mYUIMAdzY")
+            print(r.text)
+            
         
-        ax,ay = (vx1-vx0)/t, (vy1-vy0)/t
+        #print(" ")
+        #print(np.around(ax,2),np.around(ay,2),np.around(az,2),"r:",a)
         
-        x0,y0 = x1,y1
-        
-        a = np.sqrt(ax*ax+ay*ay)
-        
-        print(" ")
-        print(vx1,vy1)
-        print(ax,ay)
-        
-        
-       
         for i in range(points):
             if(i > 0):
-                Y[i-1] = Y[i]
-                Y2[i-1] = Y2[i]
-                Y3[i-1] = Y3[i]
-            Y[i] = ax
-            Y2[i] = ay
-            Y3[i] = a
+                Y_ax[i-1] = Y_ax[i]
+                Y_ay[i-1] = Y_ay[i]
+                Y_az[i-1] = Y_az[i]
+                Y_r[i-1] = Y_r[i]
+            Y_ax[i] = ax
+            Y_ay[i] = ay
+            Y_az[i] = az
+            Y_r[i] = a
             
         C=pyqtgraph.hsvColor(0,alpha=.75)
         pen=pyqtgraph.mkPen(color=C,width=2.5)
         C2=pyqtgraph.hsvColor(0.5,alpha=.75)        
         pen2=pyqtgraph.mkPen(color=C2,width=2.5)
         C3=pyqtgraph.hsvColor(0.8,alpha=.75)        
-        pen3=pyqtgraph.mkPen(color=C3,width=2.5)        
+        pen3=pyqtgraph.mkPen(color=C3,width=2.5)
+        C4=pyqtgraph.hsvColor(1,alpha=.75)        
+        pen4=pyqtgraph.mkPen(color=C4,width=2.5)  
         
-        self.grPlot.plot(X,Y,pen=pen,clear=True)
-        self.grPlot.plot(X,Y2,pen=pen2,clear=False) 
-        self.grPlot.plot(X,Y3,pen=pen3,clear=False)                
+        #self.grPlot.plot(X,Y_ax,pen=pen,clear=True)
+        #self.grPlot.plot(X,Y_ay,pen=pen2,clear=False) 
+        #self.grPlot.plot(X,Y_az,pen=pen3,clear=False)
+        self.grPlot.plot(X,Y_r,pen=pen4,clear=True)                
+
         #print("update took %.02f ms"%((time.clock()-t1)*1000))
         if self.chkMore.isChecked():
             QtCore.QTimer.singleShot(50, self.update) # QUICKLY repeat
