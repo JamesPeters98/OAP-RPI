@@ -12,13 +12,17 @@ from envirophat import motion
 
 class AccelerationGraph(QtGui.QMainWindow, ui_main.Ui_MainWindow):
     
-    global points, X, Y_ax, Y_ay, Y_az, Y_r, a, inactivity_time, inactive, fallingAccel, movementGracePeriod, sirenLength, siren
+    global points, X, Y_ax, Y_ay, Y_az, Y_r, a, inactivity_time, inactive, fallingAccel, impactAccel, movementGracePeriod, sirenLength, siren, movementUpperThreshold, movementLowerThreshold, inactivityPeriod
     
     #vars
-    points=100 #number of data points
-    movementGracePeriod=1.5
-    fallingAccel=0.15
-    sirenLength = 3
+    points=250 #number of data points
+    movementGracePeriod=2.5
+    inactivityPeriod = 3
+    fallingAccel=0.4
+    sirenLength = 6
+    impactAccel = 3
+    movementUpperThreshold = 1.3
+    movementLowerThreshold = 0.7
     
     #Initialise
     inactivity_time = 0
@@ -55,8 +59,15 @@ class AccelerationGraph(QtGui.QMainWindow, ui_main.Ui_MainWindow):
         #resultant acceleration
         a = np.sqrt(ax*ax+ay*ay+az*az)
         #Detect if in free fall
-        if(a<fallingAccel):
+        if(a<fallingAccel and not inactive):
             print("falling detected")
+            print(a)
+            inactivity_time = time.time()+movementGracePeriod
+            inactive = True
+            
+        #Detect if large impact
+        if(a>impactAccel and not inactive):
+            print("impact detected")
             print(a)
             inactivity_time = time.time()+movementGracePeriod
             inactive = True
@@ -67,25 +78,27 @@ class AccelerationGraph(QtGui.QMainWindow, ui_main.Ui_MainWindow):
             gpio.output(12, True)
             print("button press detected, false alarm")
             
-        #Movement Grace period to detect inactivity
-        if(inactivity_time < time.time() and (time.time()-inactivity_time)<=sirenLength and inactive) :
+        #Wait until after movementGracePeriod then check for any movement
+        if(inactivity_time < time.time() and (time.time()-inactivity_time)<=inactivityPeriod and inactive) :
             #print("Timer ended")
-            if((a <= 1.25) and (a >= 0.75)):
+            if((a <= movementUpperThreshold) and (a >= movementLowerThreshold)):
                inactive = True
-               if(not siren):
-                   gpio.output(12, False)
-                   siren = True
-               else:
-                   gpio.output(12, True)
-                   siren = False
-
             else:
                inactive = False
                gpio.output(12, True)
                print("movement detected, false alarm")
+               
+        if(inactivity_time+inactivityPeriod < time.time() and inactive) :
+            if(not siren):
+                gpio.output(12, False)
+                siren = True
+            else:
+                gpio.output(12, True)
+                siren = False
+            
 
         #If no movement detecting after fall, send notification    
-        if(inactivity_time < time.time() and (time.time()-inactivity_time)>sirenLength and inactive):
+        if(inactivity_time+inactivityPeriod < time.time() and (time.time()-inactivity_time-inactivityPeriod)>sirenLength and inactive):
             inactivity_time = 0
             inactive = False
             gpio.output(12, True)
