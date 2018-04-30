@@ -12,16 +12,18 @@ from envirophat import motion
 
 class AccelerationGraph(QtGui.QMainWindow, ui_main.Ui_MainWindow):
     
-    global points, X, Y_ax, Y_ay, Y_az, Y_r, a, inactivity_time, inactive, fallingAccel, movementGracePeriod
+    global points, X, Y_ax, Y_ay, Y_az, Y_r, a, inactivity_time, inactive, fallingAccel, movementGracePeriod, sirenLength, siren
     
     #vars
     points=100 #number of data points
-    movementGracePeriod=1
+    movementGracePeriod=1.5
     fallingAccel=0.15
+    sirenLength = 3
     
     #Initialise
     inactivity_time = 0
     inactive = False
+    siren = False
     
     #Array of points
     X=np.arange(points)
@@ -46,7 +48,7 @@ class AccelerationGraph(QtGui.QMainWindow, ui_main.Ui_MainWindow):
         gpio.output(12, True)
 
     def update(self):
-        global inactivity_time, inactive
+        global inactivity_time, inactive, siren
         
         #acceleration in each dimension
         ax,ay,az =  motion.accelerometer()
@@ -66,11 +68,16 @@ class AccelerationGraph(QtGui.QMainWindow, ui_main.Ui_MainWindow):
             print("button press detected, false alarm")
             
         #Movement Grace period to detect inactivity
-        if(inactivity_time < time.time() and (time.time()-inactivity_time)<=movementGracePeriod and inactive) :
+        if(inactivity_time < time.time() and (time.time()-inactivity_time)<=sirenLength and inactive) :
             #print("Timer ended")
             if((a <= 1.25) and (a >= 0.75)):
                inactive = True
-               gpio.output(12, False)
+               if(not siren):
+                   gpio.output(12, False)
+                   siren = True
+               else:
+                   gpio.output(12, True)
+                   siren = False
 
             else:
                inactive = False
@@ -78,7 +85,7 @@ class AccelerationGraph(QtGui.QMainWindow, ui_main.Ui_MainWindow):
                print("movement detected, false alarm")
 
         #If no movement detecting after fall, send notification    
-        if(inactivity_time < time.time() and (time.time()-inactivity_time)>movementGracePeriod and inactive):
+        if(inactivity_time < time.time() and (time.time()-inactivity_time)>sirenLength and inactive):
             inactivity_time = 0
             inactive = False
             gpio.output(12, True)
